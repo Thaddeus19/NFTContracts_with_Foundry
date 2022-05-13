@@ -4,7 +4,7 @@ src = 'src'
 test = 'test'
 out = 'out'
 libs = ['lib']
-remappings = ['ds-test/=lib/ds-test/src/']
+remappings = ['ds-test/=lib/ds-test/src/','openzeppelin/=lib/openzeppelin-contracts/contracts/']
 libraries = []
 cache = true
 force = false
