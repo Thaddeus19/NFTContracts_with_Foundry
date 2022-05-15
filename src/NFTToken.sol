@@ -16,22 +16,27 @@ contract NFTToken is ERC721, AccessControl, Ownable {
     ///@notice custom errors
     error thecontractispaused();
     error havenoadminrole();
-    error havenominterrole();
+    //error havenominterrole();
     error maxsupplyexceeded();
+    error wrongpayment();
+    error failwithdraw();
+    error nonexistenttoken(uint256 _tokenId);
 
     using Strings for uint256;
     using Counters for Counters.Counter;
 
-    Counters.Counter private _nextTokenId;
+    Counters.Counter public _nextTokenId;
 
     string public uriPrefix = "";
     string public uriSuffix = ".json";
 
     ///@dev If you do not wish to have a minter role and leave the minting open
     ///@dev you can delete or comment out this variable. 
-    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+    //bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
     uint256 public maxSupply = 1000;
+
+    uint256 public cost = 1 ether;
 
     bool public paused = false;
 
@@ -39,7 +44,7 @@ contract NFTToken is ERC721, AccessControl, Ownable {
 
     ///@dev Here should be the url of the metadata with the information
     ///@dev prior to revealing the actual metadata of the project. 
-    string hideUri =
+    string public hideUri =
         "https://gateway.pinata.cloud/ipfs/QmQwWMSWTV928UfMBHT8ibWTikrQ8suB7GP73ARyWuaATq";
 
     constructor(string memory _baseUri) ERC721("NFT Test", "CNFT") {
@@ -49,7 +54,7 @@ contract NFTToken is ERC721, AccessControl, Ownable {
         ///@notice This function (_setupRole) helps to assign an administrator role 
         ///@notice that can then assign new roles.
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _setupRole(MINTER_ROLE, msg.sender);
+        //_setupRole(MINTER_ROLE, msg.sender);
 
         ///@dev If you already have the IPFS url where the final metadata of the project 
         ///@dev is you can load it here in the builder. Otherwise you can delete this line 
@@ -63,7 +68,7 @@ contract NFTToken is ERC721, AccessControl, Ownable {
      */
     function mintTo(address _to) public {
         if (!hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) {
-            revert havenominterrole();
+            revert havenoadminrole();
         }
         if (paused) {
             revert thecontractispaused();
@@ -76,9 +81,12 @@ contract NFTToken is ERC721, AccessControl, Ownable {
         _safeMint(_to, currentTokenId);
     }
 
-    function mint() public {
+    function mint() public payable {
         if (paused) {
             revert thecontractispaused();
+        }
+        if(msg.value < cost){
+            revert wrongpayment();
         }
         if (totalSupply() >= maxSupply) {
             revert maxsupplyexceeded();
@@ -141,11 +149,9 @@ contract NFTToken is ERC721, AccessControl, Ownable {
         override
         returns (string memory)
     {
-        require(
-            _exists(_tokenId),
-            "ERC721Metadata: URI query for nonexistent token"
-        );
-
+        if(!_exists(_tokenId)){
+            revert nonexistenttoken(_tokenId);
+       }
         if (!reveal) {
             return hideUri;
         } else {
@@ -185,6 +191,18 @@ contract NFTToken is ERC721, AccessControl, Ownable {
         }
         reveal = true;
     }
+
+    function withdraw() public {  
+    ///@dev Do not remove this otherwise you will not be able to withdraw the funds.
+    if (!hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) {
+        revert havenoadminrole();
+    }
+    uint256 balance = address(this).balance;
+    (bool success, ) = payable(msg.sender).call{value: balance}("");
+    if(!success){
+        revert failwithdraw();
+    }
+  }
 
     ///@dev Use this function only in testnet to delete the contract at the end of the tests
     function kill() public {
